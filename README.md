@@ -6,3 +6,4 @@
 
     * DC source: Chroma 62012P-100-50
     * DC load : Chroma XXXXX
+    * DC load : Chroma 63600
