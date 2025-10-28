@@ -24,9 +24,9 @@ class HP34970A(DAQInterface):
                 if resolution is not None:
                     cmd += f',{resolution}'
             
-            # 在通道前添加掃描卡插槽號（假設格式為 '101'）
+            # 如果通道是整數，直接轉為字串
             if isinstance(channel, int):
-                channel = f'{((channel-1)//100 + 1)}{"0"}{((channel-1)%100 + 1):02d}'
+                channel = str(channel)
             
             cmd += f'(@{channel})'
             self.instrument.write(cmd)
@@ -38,13 +38,7 @@ class HP34970A(DAQInterface):
     def scan_channels(self, channel_list: List[Union[int, str]]) -> bool:
         try:
             # 轉換通道格式（如果需要）
-            formatted_channels = []
-            for ch in channel_list:
-                if isinstance(ch, int):
-                    formatted_ch = f'{((ch-1)//100 + 1)}{"0"}{((ch-1)%100 + 1):02d}'
-                    formatted_channels.append(formatted_ch)
-                else:
-                    formatted_channels.append(ch)
+            formatted_channels = [str(ch) for ch in channel_list]
             
             # 設定掃描列表
             channel_str = ','.join(formatted_channels)
@@ -74,7 +68,7 @@ class HP34970A(DAQInterface):
         try:
             # 格式化通道號
             if isinstance(channel, int):
-                channel = f'{((channel-1)//100 + 1)}{"0"}{((channel-1)%100 + 1):02d}'
+                channel = str(channel)
             
             # 讀取指定通道
             result = self.instrument.query(f'MEAS? (@{channel})')
@@ -105,11 +99,36 @@ class HP34970A(DAQInterface):
         except Exception as e:
             print(f"讀取所有通道失敗: {e}")
             return {}
-    
+
+    def read_channels(self, channels: List[Dict]) -> Dict:
+        """讀取多個通道的值"""
+        results = {}
+        for ch_info in channels:
+            channel = ch_info.get("channel")
+            unit = ch_info.get("unit")
+            if not channel or not unit:
+                continue
+
+            # Map unit to SCPI
+            unit_map = {
+                "VOLT": "VOLT:DC",
+                "RES": "RES",
+                "TEMP": "TEMP"
+            }
+            scpi_unit = unit_map.get(unit, "VOLT:DC")
+
+            # Configure and read
+            if self.configure_channel(channel, scpi_unit):
+                value = self.read_channel(channel)
+                results[str(channel)] = value
+            else:
+                results[str(channel)] = float('nan') # Indicate failure
+        return results
+
     def get_alarm_status(self, channel: Union[int, str]) -> Dict[str, bool]:
         try:
             if isinstance(channel, int):
-                channel = f'{((channel-1)//100 + 1)}{"0"}{((channel-1)%100 + 1):02d}'
+                channel = str(channel)
             
             status = self.instrument.query(f'STAT:ALARM:EVEN? (@{channel})')
             status = int(status)
@@ -127,7 +146,7 @@ class HP34970A(DAQInterface):
                  low_limit: Optional[float] = None) -> bool:
         try:
             if isinstance(channel, int):
-                channel = f'{((channel-1)//100 + 1)}{"0"}{((channel-1)%100 + 1):02d}'
+                channel = str(channel)
             
             if high_limit is not None:
                 self.instrument.write(f'CALC:LIM:UPP {high_limit},(@{channel})')

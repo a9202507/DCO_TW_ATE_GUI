@@ -1,0 +1,30 @@
+<div class="instrument-panel" id="panel-daq">
+    <h3><span class="icon">📈</span>DAQ</h3>
+    <div class="form-group">
+        <label for="address-daq">儀器位址</label>
+        <select id="address-daq" disabled>
+            <option value="">-- 等待偵測 --</option>
+        </select>
+    </div>
+    <div id="daq-channels-container">
+        <div class="panel-controls daq-channel-row">
+            <div class="form-group">
+                <label for="value-daq-channels-1">通道 1</label>
+                <input type="text" id="value-daq-channels-1" placeholder="e.g., 101">
+            </div>
+            <div class="form-group">
+                <label for="value-daq-unit-1">單位</label>
+                <select id="value-daq-unit-1">
+                    <option value="VOLT">電壓 (V)</option>
+                    <option value="RES">電阻 (Ω)</option>
+                    <option value="TEMP">溫度 (°C)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    <button id="add-daq-channel" class="btn-secondary">增加通道</button>
+    <div class="button-group">
+        <button onclick="controlInstrument('daq', 'read')" disabled>讀取</button>
+    </div>
+    <div class="status" id="status-daq"></div>
+</div>

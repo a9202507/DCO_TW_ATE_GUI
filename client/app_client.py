@@ -4,6 +4,7 @@ import httpx
 import asyncio
 import logging
 from typing import List, Dict
+from instruments.daq_factory import DAQFactory
 import time
 import socket
 import threading
@@ -273,31 +274,63 @@ async def detect_instruments():
 async def control_instrument(request: dict):
     """控制儀器API端點"""
     try:
-        name = request.get("name")
         address = request.get("address")
         action = request.get("action")
+        instrument_type = request.get("instrument_type")
+
+        if not all([address, action, instrument_type]):
+            raise HTTPException(status_code=400, detail="缺少必要參數 (address, action, instrument_type)")
+
+        logger.info(f"🎛️ 控制請求: {instrument_type} ({address}) - {action.upper()}")
+
+        global rm
+        if not rm:
+            if not initialize_visa():
+                raise HTTPException(status_code=500, detail="VISA資源管理器初始化失敗")
+
+        if instrument_type == 'daq':
+            if action == 'read':
+                channels_to_read = request.get("value")
+                if not channels_to_read or not isinstance(channels_to_read, list):
+                    raise HTTPException(status_code=400, detail="缺少DAQ通道參數 (value)")
+
+                from instruments.daq_factory import DAQFactory
+                daq_instrument = DAQFactory.create_daq(rm, address)
+                if not daq_instrument:
+                    raise HTTPException(status_code=404, detail=f"找不到或不支持的DAQ儀器 at {address}")
+
+                if not daq_instrument.connect():
+                    raise HTTPException(status_code=500, detail=f"無法連接到DAQ儀器 at {address}")
+                
+                try:
+                    results = daq_instrument.read_channels(channels_to_read)
+                    return {
+                        "success": True,
+                        "message": f"成功讀取 {len(results)} 個通道",
+                        "results": results
+                    }
+                finally:
+                    daq_instrument.disconnect()
+            else:
+                raise HTTPException(status_code=400, detail=f"不支持的DAQ動作: {action}")
+
+        elif instrument_type in ['power_supply', 'eload']:
+            success, message = control_instrument_power(address, action)
+            return {
+                "success": success,
+                "message": message,
+                "address": address,
+                "action": action.upper()
+            }
         
-        if not all([name, address, action]):
-            raise HTTPException(status_code=400, detail="缺少必要參數")
-        
-        logger.info(f"🎛️ 控制請求: {name} ({address}) - {action.upper()}")
-        
-        success, message = control_instrument_power(address, action)
-        
-        return {
-            "success": success,
-            "message": message,
-            "instrument": name,
-            "address": address,
-            "action": action.upper()
-        }
-            
+        else:
+            raise HTTPException(status_code=400, detail=f"不支持的儀器類型: {instrument_type}")
+
     except Exception as e:
         logger.error(f"❌ 控制儀器失敗: {e}")
-        return {
-            "success": False,
-            "message": f"控制失敗: {str(e)}"
-        }
+        if isinstance(e, HTTPException):
+            return {"success": False, "message": e.detail}
+        return {"success": False, "message": f"控制失敗: {str(e)}"}
 
 @app.get("/status")
 async def get_status():

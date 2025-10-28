@@ -1,7 +1,7 @@
 from typing import Optional, Type
 import pyvisa
 from .daq_interface import DAQInterface
-from .hp_34970a import HP34970A
+from .daq_hp_34970a import HP34970A
 
 class DAQFactory:
     """數據擷取器工廠類"""
@@ -10,6 +10,7 @@ class DAQFactory:
     _models = {
         "HP34970A": HP34970A,
         "Agilent34970A": HP34970A,  # Agilent 版本使用相同的驅動
+        "HEWLETT-PACKARD,34970A": HP34970A, # 原始 HP 版本
         # 之後可以在這裡添加更多型號
         # "Keysight34972A": Keysight34972A,
         # "Keithley7700": Keithley7700,

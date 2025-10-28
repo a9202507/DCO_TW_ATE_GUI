@@ -173,3 +173,12 @@ class DCSourceInterface(ABC):
             Tuple[float, float]: (最小值, 最大值)
         """
         pass
+
+    @abstractmethod
+    def get_status(self) -> Dict:
+        """獲取儀器即時狀態
+
+        Returns:
+            Dict: e.g., {'output': 'ON', 'voltage': 5.0, 'current': 1.0}
+        """
+        pass

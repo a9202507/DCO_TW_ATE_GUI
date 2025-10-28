@@ -66,7 +66,18 @@ class DAQInterface(ABC):
     
     @abstractmethod
     def read_all_channels(self) -> Dict[Union[int, str], float]:
-        """讀取所有設定的通道值"""
+        pass
+
+    @abstractmethod
+    def read_channels(self, channels: List[Dict]) -> Dict:
+        """讀取多個通道的值
+
+        Args:
+            channels: A list of dicts, e.g., [{'channel': '101', 'unit': 'VOLT'}]
+
+        Returns:
+            A dict of results, e.g., {'101': 5.001}
+        """
         pass
     
     @abstractmethod

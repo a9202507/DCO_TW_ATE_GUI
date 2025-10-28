@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import pyvisa
+from typing import Dict
 
 class LoadInterface(ABC):
     """電子負載機的抽象基類"""
@@ -63,4 +64,13 @@ class LoadInterface(ABC):
     @abstractmethod
     def measure_current(self) -> float:
         """測量電流"""
+        pass
+
+    @abstractmethod
+    def get_status(self) -> Dict:
+        """獲取儀器即時狀態
+
+        Returns:
+            Dict: e.g., {'output': 'ON', 'current': 1.2}
+        """
         pass
