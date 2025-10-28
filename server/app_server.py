@@ -6,9 +6,9 @@ import httpx
 import asyncio
 from typing import Dict, List, Optional
 import logging
-import uuid
 from datetime import datetime, timedelta
 import os
+import uuid
 
 # 設置日誌
 logging.basicConfig(level=logging.INFO)
@@ -57,16 +57,26 @@ def cleanup_expired_clients():
         del clients[client_ip]
         logger.info(f"清理過期客戶端: {client_ip}")
 
+async def check_client_connection(client_ip: str) -> bool:
+    """檢查客戶端程序是否真的在運行"""
+    client_url = f"http://{client_ip}:8001"
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            response = await client.get(f"{client_url}/status")
+            return response.status_code == 200
+    except:
+        return False
+
 def get_client_info(request: Request) -> Dict:
     """獲取當前客戶端信息"""
     client_ip = get_client_ip(request)
     cleanup_expired_clients()
     
     if client_ip not in clients:
-        # 創建新的客戶端記錄
+        # 創建新的客戶端記錄，初始狀態為 disconnected
         clients[client_ip] = {
             "ip": client_ip,
-            "status": "connected",
+            "status": "disconnected",
             "instruments": [],
             "last_seen": datetime.now(),
             "session_id": str(uuid.uuid4())[:8]
@@ -89,6 +99,12 @@ async def root(request: Request):
 async def get_my_status(request: Request):
     """獲取當前客戶端的狀態"""
     client_info = get_client_info(request)
+    client_ip = client_info["ip"]
+    
+    # 檢查客戶端程序是否真的在運行
+    is_connected = await check_client_connection(client_ip)
+    client_info["status"] = "connected" if is_connected else "disconnected"
+    
     return client_info
 
 @app.post("/api/detect")
@@ -115,7 +131,7 @@ async def detect_instruments(request: Request):
                 
     except httpx.RequestError as e:
         logger.error(f"連接客戶端 {client_ip} 失敗: {e}")
-        error_msg = f"無法連接到您的控制程式，請確認：\n1. app_client.py 正在運行\n2. 防火牆允許8001端口\n3. 網路連接正常"
+        error_msg = "無法連接到您的控制程式，請確認：\n1. app_client.py 正在運行\n2. 防火牆允許8001端口\n3. 網路連接正常"
         raise HTTPException(status_code=500, detail=error_msg)
 
 @app.post("/api/control")
@@ -140,7 +156,7 @@ async def control_instrument(request: Request):
                 
     except httpx.RequestError as e:
         logger.error(f"連接客戶端 {client_ip} 失敗: {e}")
-        error_msg = f"無法連接到您的控制程式，請確認 app_client.py 正在運行"
+        error_msg = "無法連接到您的控制程式，請確認 app_client.py 正在運行"
         raise HTTPException(status_code=500, detail=error_msg)
 
 @app.get("/api/status")
