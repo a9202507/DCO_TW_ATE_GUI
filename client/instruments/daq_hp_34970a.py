@@ -117,12 +117,20 @@ class HP34970A(DAQInterface):
             }
             scpi_unit = unit_map.get(unit, "VOLT:DC")
 
-            # Configure and read
-            if self.configure_channel(channel, scpi_unit):
-                value = self.read_channel(channel)
-                results[str(channel)] = value
-            else:
-                results[str(channel)] = float('nan') # Indicate failure
+            # Configure and read in one command
+            try:
+                # Format channel number
+                if isinstance(channel, int):
+                    channel = str(channel)
+                
+                # Query the measurement directly
+                scpi_command = f'MEAS:{scpi_unit}? (@{channel})'
+                print(f"Sending command to DAQ: {scpi_command}") # Add logging
+                result = self.instrument.query(scpi_command)
+                results[str(channel)] = float(result.strip())
+            except Exception as e:
+                print(f"Failed to read channel {channel}: {e}")
+                results[str(channel)] = float('nan')
         return results
 
     def get_alarm_status(self, channel: Union[int, str]) -> Dict[str, bool]:

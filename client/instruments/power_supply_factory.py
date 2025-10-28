@@ -2,14 +2,16 @@ from typing import Optional, Type
 import pyvisa
 from .power_supply_interface import DCSourceInterface
 from .power_supply_chroma import ChromaDCSource
+from .power_supply_chroma_62012p import Chroma62012P
 
 class DCSourceFactory:
     """DC電源供應器工廠類"""
     
     # 註冊支援的電源供應器型號
     _models = {
-        # 後續可以添加更多型號
-        # "Chroma,62012P": Chroma62012P,
+        "Chroma,62012P": Chroma62012P,
+        "CHROMA,62012P": Chroma62012P,  # 大寫變體
+        "62012P": Chroma62012P,  # 簡化匹配
         # "Chroma,62024P": Chroma62024P,
         # "HP,E3631A": HPE3631A,
         # "HP,6632B": HP6632B,
@@ -35,7 +37,7 @@ class DCSourceFactory:
             
             # 尋找對應的電源供應器類別
             for model_id, source_class in cls._models.items():
-                if model_id in idn:
+                if model_id.upper() in idn.upper():
                     return source_class(resource_manager, address)
             
             return None

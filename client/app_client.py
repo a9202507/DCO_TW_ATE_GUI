@@ -3,7 +3,7 @@ import pyvisa
 import httpx
 import asyncio
 import logging
-from typing import List, Dict
+from typing import List, Dict, Optional
 from instruments.daq_factory import DAQFactory
 import time
 import socket
@@ -59,32 +59,31 @@ def initialize_visa():
         return False
 
 def scan_gpib_instruments() -> List[Dict[str, str]]:
-    """掃描所有VISA儀器（包括GPIB、Serial、USB等）"""
+    """掃描所有VISA儀器（確保每次都獲取最新列表）"""
     found_instruments = []
-    
-    if not rm:
-        logger.error("❌ VISA資源管理器未初始化")
-        return found_instruments
-    
+    local_rm = None
+
     try:
-        # 獲取所有可用資源
-        resources = rm.list_resources()
+        # 每次掃描都創建一個新的ResourceManager以避免快取
+        local_rm = pyvisa.ResourceManager()
+    except Exception as e:
+        logger.error(f"❌ VISA初始化失敗: {e}")
+        logger.error("請確認已安裝 VISA 驅動程式和 pyvisa 套件")
+        return found_instruments
+
+    try:
+        resources = local_rm.list_resources()
         logger.info(f"🔍 掃描所有VISA資源: {resources}")
         logger.info(f"🔌 找到 {len(resources)} 個VISA資源")
         
-        # 掃描所有資源
         for resource in resources:
             try:
                 logger.info(f"🔗 嘗試連接: {resource}")
                 
-                # 嘗試連接儀器
-                inst = rm.open_resource(resource)
-                inst.timeout = 3000  # 3秒超時（縮短以避免Serial port卡住）
+                inst = local_rm.open_resource(resource)
+                inst.timeout = 3000
                 
-                # 查詢儀器身份
                 instrument_info = None
-                
-                # 嘗試標準SCPI命令
                 for cmd in ['*IDN?', 'ID?']:
                     try:
                         response = inst.query(cmd).strip()
@@ -95,16 +94,12 @@ def scan_gpib_instruments() -> List[Dict[str, str]]:
                             }
                             logger.info(f"✅ 發現儀器: {response} @ {resource}")
                             break
-                    except pyvisa.errors.VisaIOError as e:
-                        logger.debug(f"命令 {cmd} 失敗 ({resource}): {e}")
+                    except pyvisa.errors.VisaIOError:
                         continue
-                    except Exception as e:
-                        logger.debug(f"命令 {cmd} 錯誤 ({resource}): {e}")
+                    except Exception:
                         continue
                 
-                # 如果所有識別命令都失敗，至少記錄地址
                 if not instrument_info:
-                    # 判斷資源類型
                     if 'GPIB' in resource:
                         res_type = "GPIB儀器"
                     elif 'ASRL' in resource:
@@ -138,68 +133,49 @@ def scan_gpib_instruments() -> List[Dict[str, str]]:
     logger.info(f"🎯 掃描完成，共發現 {len(found_instruments)} 個儀器")
     return found_instruments
 
-def control_instrument_power(address: str, action: str) -> tuple[bool, str]:
-    """控制儀器電源"""
+def control_power_instrument(address: str, action: str, value: Optional[str] = None) -> tuple[bool, str]:
+    """控制電源或負載 (使用工廠實例)"""
     if not rm:
         return False, "VISA資源管理器未初始化"
     
     try:
-        logger.info(f"🎛️ 控制儀器 {address}: {action}")
+        logger.info(f"🎛️ 控制儀器 {address}: action={action}, value={value}")
         
-        inst = rm.open_resource(address)
-        inst.timeout = 10000  # 10秒超時
+        # 對於電源供應器，使用工廠創建實例
+        from instruments.power_supply_factory import DCSourceFactory
+        instrument = DCSourceFactory.create_dc_source(rm, address)
         
-        # 獲取儀器標識
+        if not instrument:
+            return False, f"不支持的電源供應器類型 at {address}"
+        
+        if not instrument.connect():
+            return False, f"無法連接到電源供應器 at {address}"
+        
         try:
-            idn = inst.query('*IDN?').strip()
-        except:
-            idn = ""
-        
-        # Chroma 63206A特定命令
-        if "Chroma,63206A" in idn:
-            commands = {
-                'on': ['LOAD ON'],  # Chroma 63206A specific command
-                'off': ['LOAD OFF']  # Chroma 63206A specific command
-            }
-        else:
-            # 其他儀器的標準SCPI命令
-            commands = {
-                'on': ['OUTP ON', 'OUTPUT:STATE ON', ':OUTP:STAT ON', 'OUTP 1'],
-                'off': ['OUTP OFF', 'OUTPUT:STATE OFF', ':OUTP:STAT OFF', 'OUTP 0']
-            }
-        
-        success = False
-        last_error = ""
-        
-        for cmd in commands.get(action.lower(), []):
-            try:
-                inst.write(cmd)
-                # 等待命令執行
-                time.sleep(0.5)
-                
-                # 嘗試確認狀態（可選）
-                try:
-                    inst.write('*OPC?')
-                    inst.read()
-                except:
-                    pass  # 忽略確認失敗
-                
-                success = True
-                logger.info(f"✅ 儀器 {address} {action.upper()} 成功 (命令: {cmd})")
-                break
-                
-            except Exception as e:
-                last_error = str(e)
-                logger.debug(f"命令 {cmd} 失敗: {e}")
-                continue
-        
-        inst.close()
-        
-        if success:
-            return True, f"儀器 {action.upper()} 操作成功"
-        else:
-            return False, f"所有控制命令都失敗，最後錯誤: {last_error}"
-        
+            if action == 'on':
+                success, message = instrument.turn_on()
+            elif action == 'off':
+                success, message = instrument.turn_off()
+            elif action == 'set_voltage':
+                if value is not None:
+                    success = instrument.set_voltage(1, float(value))
+                    message = "電壓設定成功" if success else "電壓設定失敗"
+                else:
+                    return False, "設定電壓需要提供數值"
+            elif action == 'set_current':
+                if value is not None:
+                    success = instrument.set_current(1, float(value))
+                    message = "電流設定成功" if success else "電流設定失敗"
+                else:
+                    return False, "設定電流需要提供數值"
+            else:
+                return False, f"不支持的動作: {action}"
+            
+            return success, message
+            
+        finally:
+            instrument.disconnect()
+            
     except Exception as e:
         logger.error(f"❌ 控制儀器 {address} 失敗: {e}")
         return False, f"控制儀器失敗: {str(e)}"
@@ -277,6 +253,7 @@ async def control_instrument(request: dict):
         address = request.get("address")
         action = request.get("action")
         instrument_type = request.get("instrument_type")
+        value = request.get("value")
 
         if not all([address, action, instrument_type]):
             raise HTTPException(status_code=400, detail="缺少必要參數 (address, action, instrument_type)")
@@ -314,8 +291,8 @@ async def control_instrument(request: dict):
             else:
                 raise HTTPException(status_code=400, detail=f"不支持的DAQ動作: {action}")
 
-        elif instrument_type in ['power_supply', 'eload']:
-            success, message = control_instrument_power(address, action)
+        elif instrument_type in ['power-supply', 'eload']:
+            success, message = control_power_instrument(address, action, value)
             return {
                 "success": success,
                 "message": message,
