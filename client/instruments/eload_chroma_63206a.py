@@ -50,3 +50,40 @@ class Chroma63206A(LoadInterface):
     
     def measure_current(self) -> float:
         return float(self.instrument.query('MEAS:CURR?'))
+
+    def measure_power(self) -> float:
+        return float(self.instrument.query('FETC:POW?'))
+
+    def get_mode(self) -> str:
+        mode = self.instrument.query('MODE?').strip()
+        mode_map = {
+            'CURR': 'CC',
+            'VOLT': 'CV',
+            'RES': 'CR',
+            'POW': 'CP'
+        }
+        return mode_map.get(mode, 'UNKNOWN')
+
+    def get_status(self) -> dict:
+        try:
+            output_str = self.instrument.query('LOAD?').strip()
+            output = 'ON' if output_str == '1' else 'OFF'
+            current = self.measure_current()
+            voltage = self.measure_voltage()
+            power = self.measure_power()
+            mode = self.get_mode()
+            return {
+                'output': output,
+                'current': current,
+                'voltage': voltage,
+                'power': power,
+                'mode': mode,
+            }
+        except Exception:
+            return {
+                'output': 'UNKNOWN',
+                'current': 0,
+                'voltage': 0,
+                'power': 0,
+                'mode': 'UNKNOWN',
+            }

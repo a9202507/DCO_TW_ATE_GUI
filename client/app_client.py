@@ -133,8 +133,8 @@ def scan_gpib_instruments() -> List[Dict[str, str]]:
     logger.info(f"🎯 掃描完成，共發現 {len(found_instruments)} 個儀器")
     return found_instruments
 
-def control_power_instrument(address: str, action: str, value: Optional[str] = None) -> tuple[bool, str]:
-    """控制電源或負載 (使用工廠實例)"""
+def control_dc_source_instrument(address: str, action: str, value: Optional[str] = None) -> tuple[bool, str]:
+    """控制電源 (使用工廠實例)"""
     if not rm:
         return False, "VISA資源管理器未初始化"
     
@@ -179,6 +179,52 @@ def control_power_instrument(address: str, action: str, value: Optional[str] = N
     except Exception as e:
         logger.error(f"❌ 控制儀器 {address} 失敗: {e}")
         return False, f"控制儀器失敗: {str(e)}"
+
+def control_eload_instrument(address: str, action: str, value: Optional[str] = None) -> tuple[bool, str]:
+    """控制電子負載 (使用工廠實例)"""
+    if not rm:
+        return False, "VISA資源管理器未初始化"
+
+    try:
+        logger.info(f"🎛️ 控制電子負載 {address}: action={action}, value={value}")
+
+        from instruments.eload_factory import LoadFactory
+        instrument = LoadFactory.create_load(rm, address)
+
+        if not instrument:
+            return False, f"不支持的電子負載類型 at {address}"
+
+        if not instrument.connect():
+            return False, f"無法連接到電子負載 at {address}"
+
+        try:
+            if action == 'on':
+                success, message = instrument.turn_on()
+            elif action == 'off':
+                success, message = instrument.turn_off()
+            elif action == 'set_mode':
+                if value is not None:
+                    instrument.set_mode(str(value))
+                    success, message = True, f"模式設定為 {value} 成功"
+                else:
+                    return False, "設定模式需要提供數值"
+            elif action == 'set_current':
+                if value is not None:
+                    instrument.set_current(float(value))
+                    success, message = True, "電流設定成功"
+                else:
+                    return False, "設定電流需要提供數值"
+            else:
+                return False, f"不支持的動作: {action}"
+            
+            return success, message
+
+        finally:
+            instrument.disconnect()
+
+    except Exception as e:
+        logger.error(f"❌ 控制電子負載 {address} 失敗: {e}")
+        return False, f"控制電子負載失敗: {str(e)}"
 
 async def heartbeat_to_server():
     """定期向服務器發送心跳"""
@@ -291,8 +337,17 @@ async def control_instrument(request: dict):
             else:
                 raise HTTPException(status_code=400, detail=f"不支持的DAQ動作: {action}")
 
-        elif instrument_type in ['power-supply', 'eload']:
-            success, message = control_power_instrument(address, action, value)
+        elif instrument_type == 'power-supply':
+            success, message = control_dc_source_instrument(address, action, value)
+            return {
+                "success": success,
+                "message": message,
+                "address": address,
+                "action": action.upper()
+            }
+
+        elif instrument_type == 'eload':
+            success, message = control_eload_instrument(address, action, value)
             return {
                 "success": success,
                 "message": message,
