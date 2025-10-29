@@ -1,9 +1,46 @@
 from typing import Dict, Optional, Tuple
 import time
+import pyvisa
 from .power_supply_interface import DCSourceInterface, OutputTrackingMode
 
 class Chroma62012P(DCSourceInterface):
     """Chroma 62012P DC電源供應器實現"""
+
+    def __init__(self, resource_manager: pyvisa.ResourceManager, address: str):
+        super().__init__(resource_manager, address)
+        self.max_voltage = 120.0  # 預設最大電壓
+        self.max_current = 50.0   # 預設最大電流
+        self._identify_model()    # 識別具體型號並設置限制
+
+    def _identify_model(self):
+        """根據儀器型號識別具體規格並設置限制"""
+        try:
+            idn = self.get_identification()
+            if idn:
+                # 解析型號，例如 "CHROMA,62012P-100-50,..."
+                parts = idn.split(',')
+                if len(parts) >= 2:
+                    model_part = parts[1].strip()
+                    if '62012P' in model_part:
+                        # 解析型號規格，例如 62012P-100-50
+                        model_specs = model_part.split('-')
+                        if len(model_specs) >= 3:
+                            try:
+                                voltage_spec = float(model_specs[1])  # 100V
+                                current_spec = float(model_specs[2])  # 50A
+                                self.max_voltage = voltage_spec
+                                self.max_current = current_spec
+                                print(f"識別到 Chroma 62012P 型號: {model_part}, 限制: {self.max_voltage}V, {self.max_current}A")
+                            except (ValueError, IndexError):
+                                print(f"無法解析型號規格: {model_part}，使用預設值")
+                        else:
+                            print(f"型號格式不正確: {model_part}，使用預設值")
+                    else:
+                        print(f"非預期的型號: {model_part}，使用預設值")
+            else:
+                print("無法獲取儀器識別信息，使用預設值")
+        except Exception as e:
+            print(f"型號識別失敗: {e}，使用預設值")
 
     def get_identification(self) -> str:
         try:
@@ -13,6 +50,14 @@ class Chroma62012P(DCSourceInterface):
 
     def set_voltage(self, channel: int, voltage: float) -> bool:
         try:
+            # 檢查電壓是否超過限制
+            if voltage > self.max_voltage:
+                print(f"電壓設定 {voltage}V 超過儀器限制 {self.max_voltage}V")
+                return False
+            if voltage < 0:
+                print(f"電壓設定 {voltage}V 無效，必須大於等於 0V")
+                return False
+
             # 使用 SCPI 命令設定電壓，例如 SOUR:VOLT 80.00
             self.instrument.write(f'SOUR:VOLT {voltage}')
             return True
@@ -22,6 +67,14 @@ class Chroma62012P(DCSourceInterface):
 
     def set_current(self, channel: int, current: float) -> bool:
         try:
+            # 檢查電流是否超過限制
+            if current > self.max_current:
+                print(f"電流設定 {current}A 超過儀器限制 {self.max_current}A")
+                return False
+            if current < 0:
+                print(f"電流設定 {current}A 無效，必須大於等於 0A")
+                return False
+
             self.instrument.write(f'SOUR:CURR {current}')
             return True
         except Exception as e:
@@ -160,15 +213,15 @@ class Chroma62012P(DCSourceInterface):
 
     def get_voltage_range(self, channel: int) -> Tuple[float, float]:
         try:
-            # 根據手冊，Chroma 62012P 的電壓範圍是 0-120V
-            return (0.0, 120.0)
+            # 返回基於識別到的型號的電壓範圍
+            return (0.0, self.max_voltage)
         except Exception:
             return (0.0, 0.0)
 
     def get_current_range(self, channel: int) -> Tuple[float, float]:
         try:
-            # 根據手冊，Chroma 62012P 的電流範圍是 0-50A
-            return (0.0, 50.0)
+            # 返回基於識別到的型號的電流範圍
+            return (0.0, self.max_current)
         except Exception:
             return (0.0, 0.0)
 

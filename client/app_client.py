@@ -338,13 +338,42 @@ async def control_instrument(request: dict):
                 raise HTTPException(status_code=400, detail=f"不支持的DAQ動作: {action}")
 
         elif instrument_type == 'power-supply':
-            success, message = control_dc_source_instrument(address, action, value)
-            return {
-                "success": success,
-                "message": message,
-                "address": address,
-                "action": action.upper()
-            }
+            from instruments.power_supply_factory import DCSourceFactory
+            instrument = DCSourceFactory.create_dc_source(rm, address)
+            if not instrument:
+                raise HTTPException(status_code=404, detail=f"找不到或不支持的電源供應器 at {address}")
+
+            if not instrument.connect():
+                raise HTTPException(status_code=500, detail=f"無法連接到電源供應器 at {address}")
+            
+            try:
+                if action == 'set_voltage':
+                    if value is not None:
+                        success = instrument.set_voltage(1, float(value))
+                        message = "電壓設定成功" if success else f"電壓設定失敗: 超出儀器限制 ({value}V)"
+                    else:
+                        return {"success": False, "message": "設定電壓需要提供數值"}
+                elif action == 'set_current':
+                    if value is not None:
+                        success = instrument.set_current(1, float(value))
+                        message = "電流設定成功" if success else f"電流設定失敗: 超出儀器限制 ({value}A)"
+                    else:
+                        return {"success": False, "message": "設定電流需要提供數值"}
+                elif action == 'on':
+                    success, message = instrument.turn_on()
+                elif action == 'off':
+                    success, message = instrument.turn_off()
+                else:
+                    return {"success": False, "message": f"不支持的電源供應器動作: {action}"}
+                
+                return {
+                    "success": success,
+                    "message": message,
+                    "address": address,
+                    "action": action.upper()
+                }
+            finally:
+                instrument.disconnect()
 
         elif instrument_type == 'eload':
             success, message = control_eload_instrument(address, action, value)
