@@ -5,6 +5,7 @@ import asyncio
 import logging
 from typing import List, Dict, Optional
 from instruments.daq_factory import DAQFactory
+from instruments.afg_factory import AFGFactory
 import time
 import socket
 import threading
@@ -383,6 +384,43 @@ async def control_instrument(request: dict):
                 "address": address,
                 "action": action.upper()
             }
+
+        elif instrument_type == 'afg':
+            from instruments.afg_factory import AFGFactory
+            instrument = AFGFactory.create_afg(rm, address)
+            if not instrument:
+                raise HTTPException(status_code=404, detail=f"找不到或不支持的AFG儀器 at {address}")
+
+            if not instrument.connect():
+                raise HTTPException(status_code=500, detail=f"無法連接到AFG儀器 at {address}")
+
+            try:
+                if action == 'set_frequency':
+                    if value is not None:
+                        channel = int(request.get("channel", 1))
+                        success = instrument.set_frequency(channel, float(value))
+                        message = "頻率設定成功" if success else "頻率設定失敗"
+                    else:
+                        return {"success": False, "message": "設定頻率需要提供數值"}
+                elif action == 'on':
+                    channel = int(request.get("channel", 1))
+                    success = instrument.output_on(channel)
+                    message = "輸出開啟成功" if success else "輸出開啟失敗"
+                elif action == 'off':
+                    channel = int(request.get("channel", 1))
+                    success = instrument.output_off(channel)
+                    message = "輸出關閉成功" if success else "輸出關閉失敗"
+                else:
+                    return {"success": False, "message": f"不支持的AFG動作: {action}"}
+                
+                return {
+                    "success": success,
+                    "message": message,
+                    "address": address,
+                    "action": action.upper()
+                }
+            finally:
+                instrument.disconnect()
         
         else:
             raise HTTPException(status_code=400, detail=f"不支持的儀器類型: {instrument_type}")

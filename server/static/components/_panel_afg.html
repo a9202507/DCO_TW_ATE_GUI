@@ -1,0 +1,28 @@
+<div class="instrument-panel" id="panel-afg">
+    <h3><span class="icon">〰️</span>AFG</h3>
+    <div class="form-group">
+        <label for="address-afg">儀器位址</label>
+        <select id="address-afg" disabled>
+            <option value="">-- 等待偵測 --</option>
+        </select>
+    </div>
+    <div class="panel-status-display" id="status-display-afg">
+        <!-- Real-time status will be injected here -->
+    </div>
+    <div class="panel-controls">
+        <div class="form-group">
+            <label for="channel-afg">通道</label>
+            <input type="number" id="channel-afg" placeholder="e.g., 1" value="1">
+        </div>
+        <div class="form-group">
+            <label for="value-afg-frequency">頻率 (Hz)</label>
+            <input type="number" id="value-afg-frequency" placeholder="e.g., 1000" step="100">
+        </div>
+        <button onclick="controlInstrument('afg', 'set_frequency')" disabled>設定頻率</button>
+    </div>
+    <div class="button-group">
+        <button onclick="controlInstrument('afg', 'on')" disabled>開啟</button>
+        <button onclick="controlInstrument('afg', 'off')" disabled>關閉</button>
+    </div>
+    <div class="status" id="status-afg"></div>
+</div>

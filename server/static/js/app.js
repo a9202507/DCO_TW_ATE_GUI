@@ -1,6 +1,6 @@
 let clientInfo = {};
 let isDetecting = false;
-const instrumentTypes = ["power-supply", "eload", "daq", "scope"];
+const instrumentTypes = ["power-supply", "afg", "eload", "daq", "scope"];
 const pollingIntervals = {};
 let daqChannelCount = 1;
 
@@ -142,6 +142,13 @@ async function controlInstrument(instrumentType, action) {
       const unit = row.querySelector("select").value;
       if (channel) payload.value.push({ channel, unit });
     });
+  }
+
+  if (instrumentType === "afg") {
+    payload.channel = document.getElementById("channel-afg").value;
+    if (action === "set_frequency") {
+        payload.value = document.getElementById("value-afg-frequency").value;
+    }
   }
 
   console.log("Sending payload:", JSON.stringify(payload, null, 2));
