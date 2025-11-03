@@ -34,6 +34,7 @@ header {
   justify-content: center;
   gap: 20px;
   flex-wrap: nowrap;
+  position: relative;
 }
 .logo-container {
   display: flex;
@@ -59,6 +60,21 @@ header h1 {
 header h1 .icon {
   margin-right: 15px;
   vertical-align: middle;
+}
+
+.version-badge {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.85em;
+  font-weight: 500;
+  font-family: "Fira Code", monospace;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  letter-spacing: 0.5px;
 }
 
 /* Client Info Section */
@@ -414,5 +430,9 @@ h2 .icon {
   .logo {
     max-height: 50px;
     max-width: 120px;
+  }
+  .version-badge {
+    position: static;
+    margin-top: 10px;
   }
 }
