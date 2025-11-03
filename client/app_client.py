@@ -21,7 +21,7 @@ instruments: Dict[str, any] = {}
 
 # 客戶端配置
 CLIENT_CONFIG = {
-    "server_host": "192.168.0.144",  # 服務器地址
+    "server_host": "127.0.0.1",  # 服務器地址
     "server_port": 8000,
     "client_port": 8001,
     "heartbeat_interval": 30  # 心跳間隔（秒）
@@ -449,7 +449,23 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
+    import argparse
     
+    # 創建參數解析器
+    parser = argparse.ArgumentParser(description="GPIB儀器控制客戶端")
+    
+    # 添加 --host 參數
+    parser.add_argument(
+        "--host",
+        type=str,
+        default=CLIENT_CONFIG["server_host"],
+        help=f"服務器地址 (預設: {CLIENT_CONFIG['server_host']})"
+    )
+    
+    # 更新配置
+    args = parser.parse_args()
+    CLIENT_CONFIG["server_host"] = args.host
+
     print("=" * 60)
     print("🔧 GPIB儀器控制客戶端 v2.0.0")
     print("=" * 60)
