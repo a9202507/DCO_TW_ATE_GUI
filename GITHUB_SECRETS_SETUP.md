@@ -1,17 +1,20 @@
-# GitHub Secrets 設置指南
+# GitHub Secrets 設置指南 20251105
 
 ## 📍 找到 Secrets 設置位置
 
 ### 步驟 1: 進入倉庫 Settings
+
 1. 打開您的 GitHub 倉庫頁面
 2. 點擊右上角的 **"Settings"** 標籤
 
 ### 步驟 2: 找到 Secrets 選項
+
 1. 在左側選單中向下滾動
 2. 找到 **"Secrets and variables"** 部分
 3. 點擊 **"Actions"**
 
 ### 步驟 3: 添加新的 Secret
+
 1. 點擊綠色的 **"New repository secret"** 按鈕
 
 ---
@@ -19,12 +22,14 @@
 ## 🔐 添加 Docker Hub 憑證
 
 ### Secret 1: DOCKERHUB_USERNAME
+
 ```
 Name: DOCKERHUB_USERNAME
 Value: a9202507
 ```
 
 ### Secret 2: DOCKERHUB_TOKEN
+
 ```
 Name: DOCKERHUB_TOKEN
 Value: [您的 Docker Hub Access Token]
@@ -54,6 +59,7 @@ GitHub 倉庫頁面
 添加完 secrets 後：
 
 1. **推送測試代碼**：
+
    ```bash
    git add .
    git commit -m "Test Docker automation"
@@ -61,6 +67,7 @@ GitHub 倉庫頁面
    ```
 
 2. **檢查 Actions**：
+
    - 前往倉庫的 "Actions" 標籤
    - 查看是否有新的 workflow 運行
    - 如果成功，會看到 Docker 鏡像被推送
